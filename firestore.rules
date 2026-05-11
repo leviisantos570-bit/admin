@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt']) &&
+               data.keys().size() <= 10 &&
+               data.uid == request.auth.uid &&
+               data.email is string && data.email.size() <= 256 &&
+               data.createdAt == request.time;
+      }
+
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && isVerified();
+      allow update: if isOwner(userId) && 
+                      incoming().uid == existing().uid &&
+                      incoming().createdAt == existing().createdAt &&
+                      incoming().updatedAt == request.time &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+    }
+
+    // 2. Ideas Collection
+    match /ideas/{ideaId} {
+      function isValidIdea(data) {
+        return data.keys().hasAll(['userId', 'title', 'status', 'createdAt']) &&
+               data.keys().size() <= 10 &&
+               data.userId == request.auth.uid &&
+               data.title is string && data.title.size() <= 500 &&
+               data.status in ['Researching', 'Scripting', 'Published', 'Archived'] &&
+               data.createdAt == request.time;
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidIdea(incoming()) && isVerified();
+      
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && 
+                      isValidIdea(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().createdAt == existing().createdAt &&
+                      (
+                        // Action: Update Status or Metadata
+                        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'topic', 'status', 'aiInsights', 'date'])
+                      );
+      
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // 3. Keyword Searches Collection
+    match /keywordSearches/{searchId} {
+      function isValidSearch(data) {
+        return data.keys().hasAll(['userId', 'topic', 'results', 'createdAt']) &&
+               data.userId == request.auth.uid &&
+               data.topic is string && data.topic.size() <= 200 &&
+               data.createdAt == request.time;
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidSearch(incoming()) && isVerified();
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}

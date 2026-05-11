@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "Idea": {
+      "title": "Content Idea",
+      "description": "A saved video idea from the Lab",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "topic": { "type": "string" },
+        "status": { "type": "string", "enum": ["Researching", "Scripting", "Published", "Archived"] },
+        "date": { "type": "string", "format": "date-time" },
+        "aiInsights": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "status", "createdAt"]
+    },
+    "KeywordSearch": {
+      "title": "Keyword Search History",
+      "description": "History of niche analysis",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "topic": { "type": "string" },
+        "results": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "topic", "results", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles"
+    },
+    "/ideas/{ideaId}": {
+      "schema": "Idea",
+      "description": "Global collection of ideas (secured by userId)"
+    },
+    "/keywordSearches/{searchId}": {
+      "schema": "KeywordSearch",
+      "description": "Global collection of keyword searches (secured by userId)"
+    }
+  }
+}
